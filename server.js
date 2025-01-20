@@ -11,11 +11,23 @@ let players = [];
 let playersInGame = [];
 let messages = [];
 let gameCanStart = false;
-const roles = ['werewolf', "werewolf", "werewolf", "villager", "villager", "villager", "villager", "villager", "seer"];
-let currentPhase = 'waiting'; // waiting, night-werewolf, day-discussion, day-vote
+let roles = [];
+// const roles = ['werewolf', "villager", "seer", "hunter"];
+// const roles = ['werewolf', "werewolf", "werewolf", "villager", "villager", "villager", "villager", "villager", "seer"];
+const roleConfigurations = {
+    6: ['werewolf', 'werewolf', 'villager', 'villager', 'seer', 'hunter'],
+    7: ['werewolf', 'werewolf', 'villager', 'villager', 'villager', 'seer', 'hunter'],
+    8: ['werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter'],
+    9: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter'],
+    10: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter'],
+    11: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter'],
+    12: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter']
+};
+let currentPhase = 'waiting'; // waiting, night-werewolf, day-discussion, day-vote, night-seer, hunter-phase
 let phaseTimeout = null;
 let werewolfVotedArray = [];
 let dayVotedArray = [];
+let killedByHunter = '';
 let nightKilled = '';
 let dayKilled = '';
 const PHASE_DURATIONS = {
@@ -23,13 +35,11 @@ const PHASE_DURATIONS = {
     'night-werewolf': 30000,    // 30 secondes pour les loups
     'day-discussion': 120000,   // 2 minutes de discussion
     'day-vote': 30000,          // 30 secondes pour voter
+    'hunter-phase-1': 10000,    // 10 secondes pour le hunter
+    'hunter-phase-2': 10000,    // 10 secondes pour le hunter
 };
 let currentPhaseStartTime = null;
 let phaseTimeRemainingInterval = null;
-
-// function assignRoles() {
-//     return roles.sort(() => Math.random() - 0.5);
-// }
 
 // Fonction pour assigner aléatoirement des rôles
 function assignRoles() {
@@ -139,6 +149,11 @@ function findKeyWithMaxValue(obj) {
 }
 
 function checkGameState() {
+    if (playersInGame.filter(p => p.role !== '').length === 0) {
+        console.log('Les rôles ne sont pas encore distribués.');
+        return;
+    }
+
     const werewolves = playersInGame.filter(player => player.role === 'werewolf' && player.isAlive);
     const villagers = playersInGame.filter(player => player.role !== 'werewolf' && player.isAlive);
 
@@ -172,6 +187,7 @@ function stopGame() {
     dayVotedArray = [];
     nightKilled = '';
     dayKilled = '';
+    killedByHunter = '';
     messages = [];
     currentPhase = 'waiting';
     currentPhaseStartTime = null;
@@ -182,7 +198,7 @@ function stopGame() {
     broadcast({ type: 'gameStopped', message: 'La partie a été arrêtée.' });
     broadcast({ type: 'playersInGameUpdate', players: playersInGame.map((p) => ({ id: p.id, pseudo: p.pseudo, role: p.role, isAlive: p.isAlive, isMayor: p.isMayor })) });
 
-    broadcast({type: 'resetGame'})
+    broadcast({ type: 'resetGame' })
 
     console.log('La partie a été arrêtée.');
 }
@@ -203,6 +219,16 @@ function startNextPhase() {
             break;
         case 'night-werewolf':
             executeWerewolfVotes();
+            checkGameState();
+            currentPhase = 'hunter-phase-1';
+            if (playersInGame.find(player => player.role === 'hunter').isAlive) {
+                startNextPhase();
+            }
+            if (killedByHunter !== '') {
+                startNextPhase();
+            }
+            break;
+        case 'hunter-phase-1':
             currentPhase = 'day-discussion';
             checkGameState();
             break;
@@ -211,7 +237,17 @@ function startNextPhase() {
             break;
         case 'day-vote':
             executeDayVotes();
-            currentPhase = 'night-werewolf';
+            checkGameState();
+            currentPhase = 'hunter-phase-2';
+            if (playersInGame.find(player => player.role === 'hunter').isAlive) {
+                startNextPhase();
+            }
+            if (killedByHunter !== '') {
+                startNextPhase();
+            }
+            break;
+        case 'hunter-phase-2':
+            currentPhase = 'night-seer';
             checkGameState();
             break;
     }
@@ -290,10 +326,49 @@ wss.on('connection', (ws) => {
                 playersInGame.push(players.find(player => player.pseudo === pseudo));
                 broadcast({ type: 'playersInGameUpdate', players: playersInGame.map((p) => ({ id: p.id, pseudo: p.pseudo, role: p.role, isAlive: p.isAlive, isMayor: p.isMayor })) });
 
-                if (playersInGame.length === roles.length) {
+                // if (playersInGame.length === roles.length) {
+                //     gameCanStart = true;
+                //     broadcast({ type: 'gameCanStart', message: 'La partie peut commencer !' });
+                // }
+                if (roleConfigurations[playersInGame.length]) {
+                    roles = roleConfigurations[playersInGame.length];
                     gameCanStart = true;
                     broadcast({ type: 'gameCanStart', message: 'La partie peut commencer !' });
                 }
+            }
+
+            if (parsedMessage.type === 'leaveGame') {
+                const roleDistributed = parsedMessage.data.roleDistributed;
+                const pseudo = parsedMessage.data.pseudo;
+                playersInGame = playersInGame.filter(player => player.pseudo !== pseudo);
+                gameCanStart = false;
+
+                if (roleDistributed) {
+                    playersInGame.forEach(player => {
+                        player.role = '';
+                    });
+                }
+
+                broadcast({ type: 'playersInGameUpdate', players: playersInGame.map((p) => ({ id: p.id, pseudo: p.pseudo, role: p.role, isAlive: p.isAlive, isMayor: p.isMayor })) });
+
+                if (!roleConfigurations[playersInGame.length]) {
+                    broadcast({ type: 'gameCantStart', message: 'La partie ne peut commencer car il manque des joueurs.' });
+                }
+            }
+
+            if (parsedMessage.type === 'hunterKill') {
+                hunterPseudo = parsedMessage.data.hunterPseudo;
+                playerPseudo = parsedMessage.data.playerPseudo;
+                playersInGame.forEach((player) => {
+                    if (player.pseudo === playerPseudo) {
+                        player.isAlive = false;
+                        killedByHunter = player.pseudo;
+                    }
+                });
+                broadcast({ type: 'hunterHasKill', hunterPseudo: hunterPseudo, playerPseudo: playerPseudo, message: `${hunterPseudo}, le chasseur, a tué ${playerPseudo} !` });
+                broadcast({ type: 'playersInGameUpdate', players: playersInGame.map((p) => ({ id: p.id, pseudo: p.pseudo, role: p.role, isAlive: p.isAlive, isMayor: p.isMayor })) });
+                checkGameState();
+                startNextPhase();
             }
 
             if (parsedMessage.type === 'distributeRoles') {
@@ -348,10 +423,13 @@ wss.on('connection', (ws) => {
 
     ws.on('close', () => {
         players = players.filter((p) => p.ws !== ws);
+        playersInGame = playersInGame.filter((p) => p.ws !== ws);
         broadcast({
             type: 'playersUpdate',
             players: players.map((p) => ({ id: p.id, pseudo: p.pseudo, role: p.role }))
         });
+        broadcast({ type: 'playersInGameUpdate', players: playersInGame.map((p) => ({ id: p.id, pseudo: p.pseudo, role: p.role, isAlive: p.isAlive, isMayor: p.isMayor })) });
+        checkGameState();
         console.log('Un joueur s\'est déconnecté.');
     });
 });
@@ -360,7 +438,9 @@ const PORT = 3000;
 // const HOST = '172.16.10.111';
 // const HOST = '172.20.10.2';
 // const HOST = '192.168.1.189';
-server.listen(PORT, () => {
-    console.log(`Serveur démarré sur http://localhost:${PORT}`);
-    console.log(`WebSocket en écoute sur ws://localhost:${PORT}`);
+// const HOST = '192.168.1.31';
+const HOST = '172.16.10.97';
+server.listen(PORT, HOST, () => {
+    console.log(`Serveur démarré sur http://${HOST}:${PORT}`);
+    console.log(`WebSocket en écoute sur ws://${HOST}:${PORT}`);
 });
