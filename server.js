@@ -15,6 +15,7 @@ let roles = [];
 // const roles = ['werewolf', "villager", "seer", "hunter"];
 // const roles = ['werewolf', "werewolf", "werewolf", "villager", "villager", "villager", "villager", "villager", "seer"];
 const roleConfigurations = {
+    4: ['werewolf', 'seer', 'villager', 'villager'],
     6: ['werewolf', 'werewolf', 'villager', 'villager', 'seer', 'hunter'],
     7: ['werewolf', 'werewolf', 'villager', 'villager', 'villager', 'seer', 'hunter'],
     8: ['werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter'],
@@ -33,7 +34,7 @@ let dayKilled = '';
 const PHASE_DURATIONS = {
     'night-seer': 20000,        // 30 secondes pour le seer
     'night-werewolf': 30000,    // 30 secondes pour les loups
-    'day-discussion': 120000,   // 2 minutes de discussion
+    'day-discussion': 10000,   // 2 minutes de discussion
     'day-vote': 30000,          // 30 secondes pour voter
     'hunter-phase-1': 10000,    // 10 secondes pour le hunter
     'hunter-phase-2': 10000,    // 10 secondes pour le hunter
@@ -96,17 +97,19 @@ function executeWerewolfVotes() {
 }
 
 function executeDayVotes() {
-    var dayVotedNumber = {};
-    dayVotedArray.forEach((vote) => {
-        dayVotedNumber[vote.votedPseudo] = (dayVotedNumber[vote.votedPseudo] || 0) + 1;
-    });
+    const dayVotedNumber = dayVotedArray.reduce((acc, vote) => {
+        acc[vote.votedPseudo] = (acc[vote.votedPseudo] || 0) + 1;
+        return acc;
+    }, {});
+
     const result = findKeyWithMaxValue(dayVotedNumber);
-    playersInGame.forEach((player) => {
-        if (player.pseudo === result) {
-            player.isAlive = false;
-            dayKilled = player.pseudo;
-        }
-    });
+    const playerToKill = playersInGame.find(player => player.pseudo === result);
+
+    if (playerToKill) {
+        playerToKill.isAlive = false;
+        dayKilled = playerToKill.pseudo;
+    }
+    
     broadcast({ type: "playersInGameUpdate", players: playersInGame.map((p) => ({ id: p.id, pseudo: p.pseudo, role: p.role, isAlive: p.isAlive, isMayor: p.isMayor })) });
     dayVotedArray = [];
     broadcast({ type: 'dayHasVoted', dayVotedArray: dayVotedArray });
@@ -210,7 +213,7 @@ function startNextPhase() {
     switch (currentPhase) {
         case 'waiting':
             currentPhase = 'night-seer';
-            if (!playersInGame.find(player => player.role === 'seer') || !playersInGame.find(player => player.role === 'seer').isAlive) {
+            if (playersInGame.find(player => player.role === 'seer') === undefined || playersInGame.find(player => player.role === 'seer').isAlive === false) {
                 startNextPhase();
             }
             break;
@@ -221,7 +224,7 @@ function startNextPhase() {
             executeWerewolfVotes();
             checkGameState();
             currentPhase = 'hunter-phase-1';
-            if (!playersInGame.find(player => player.role === 'hunter') || playersInGame.find(player => player.role === 'hunter').isAlive) {
+            if (playersInGame.find(player => player.role === 'hunter') === undefined || playersInGame.find(player => player.role === 'hunter').isAlive === false) {
                 startNextPhase();
             }
             if (killedByHunter !== '') {
@@ -239,7 +242,7 @@ function startNextPhase() {
             executeDayVotes();
             checkGameState();
             currentPhase = 'hunter-phase-2';
-            if (playersInGame.find(player => player.role === 'hunter').isAlive) {
+            if (playersInGame.find(player => player.role === 'hunter') === undefined || playersInGame.find(player => player.role === 'hunter').isAlive === false) {
                 startNextPhase();
             }
             if (killedByHunter !== '') {
@@ -249,6 +252,9 @@ function startNextPhase() {
         case 'hunter-phase-2':
             currentPhase = 'night-seer';
             checkGameState();
+            if (playersInGame.find(player => player.role === 'seer') === undefined || playersInGame.find(player => player.role === 'seer').isAlive === false) {
+                startNextPhase();
+            }
             break;
     }
 
