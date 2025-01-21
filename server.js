@@ -15,6 +15,9 @@ let roles = [];
 // const roles = ['werewolf', "villager", "seer", "hunter"];
 // const roles = ['werewolf', "werewolf", "werewolf", "villager", "villager", "villager", "villager", "villager", "seer"];
 const roleConfigurations = {
+    // 2: ['werewolf', 'villager'],
+    // 3: ['werewolf', 'villager', 'villager'],
+    // 4: ['werewolf', 'littleGirl', 'villager', 'villager'],
     6: ['werewolf', 'werewolf', 'villager', 'villager', 'seer', 'hunter'],
     7: ['werewolf', 'werewolf', 'villager', 'villager', 'villager', 'seer', 'hunter'],
     8: ['werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter'],
@@ -210,7 +213,7 @@ function startNextPhase() {
     switch (currentPhase) {
         case 'waiting':
             currentPhase = 'night-seer';
-            if (!playersInGame.find(player => player.role === 'seer').isAlive) {
+            if (!playersInGame.find(player => player.role === 'seer') || !playersInGame.find(player => player.role === 'seer').isAlive) {
                 startNextPhase();
             }
             break;
@@ -221,7 +224,7 @@ function startNextPhase() {
             executeWerewolfVotes();
             checkGameState();
             currentPhase = 'hunter-phase-1';
-            if (playersInGame.find(player => player.role === 'hunter').isAlive) {
+            if (!playersInGame.find(player => player.role === 'hunter') || playersInGame.find(player => player.role === 'hunter').isAlive) {
                 startNextPhase();
             }
             if (killedByHunter !== '') {
@@ -314,9 +317,17 @@ wss.on('connection', (ws) => {
             if (parsedMessage.type === 'message') {
                 const { chatType, message: msgData, sender } = parsedMessage.data;
 
+                const senderPlayer = players.find(player => player.pseudo === sender);
+
+                const isNight = currentPhase === 'night-seer' || currentPhase === 'night-werewolf';
+
+                const time = isNight ? 'night' : 'day';
+
                 if (chatType === 'general') {
-                    broadcast({ type: 'general', message: msgData, sender, role: players.find(player => player.pseudo === sender)?.role });
-                    messages.push({ type: 'general', message: msgData, sender, role: players.find(player => player.pseudo === sender)?.role });
+                    // broadcast({ type: 'general', message: msgData, sender, role: players.find(player => player.pseudo === sender)?.role });
+                    // messages.push({ type: 'general', message: msgData, sender, role: players.find(player => player.pseudo === sender)?.role });
+                    broadcast({ type: 'general', message: msgData, sender: senderPlayer, time });
+                    messages.push({ type: 'general', message: msgData, sender: senderPlayer, time });
                 }
                 return;
             }
