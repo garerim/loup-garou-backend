@@ -15,16 +15,13 @@ let roles = [];
 // const roles = ['werewolf', "villager", "seer", "hunter"];
 // const roles = ['werewolf', "werewolf", "werewolf", "villager", "villager", "villager", "villager", "villager", "seer"];
 const roleConfigurations = {
-    // 2: ['werewolf', 'villager'],
-    // 3: ['werewolf', 'villager', 'villager'],
-    // 4: ['werewolf', 'littleGirl', 'villager', 'villager'],
     6: ['werewolf', 'werewolf', 'villager', 'villager', 'seer', 'hunter'],
     7: ['werewolf', 'werewolf', 'villager', 'villager', 'villager', 'seer', 'hunter'],
     8: ['werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter'],
-    9: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter'],
-    10: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter'],
-    11: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter'],
-    12: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter']
+    9: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'seer', 'hunter', 'littleGirl'],
+    10: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter', 'littleGirl'],
+    11: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter', 'littleGirl'],
+    12: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter', 'littleGirl']
 };
 let currentPhase = 'waiting'; // waiting, night-werewolf, day-discussion, day-vote, night-seer, hunter-phase
 let phaseTimeout = null;
