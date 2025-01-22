@@ -15,7 +15,7 @@ let roles = [];
 // const roles = ['werewolf', "villager", "seer", "hunter"];
 // const roles = ['werewolf', "werewolf", "werewolf", "villager", "villager", "villager", "villager", "villager", "seer"];
 const roleConfigurations = {
-    4: ['werewolf', 'seer', 'villager', 'villager'],
+    4: ['werewolf', 'witch', 'villager', 'villager'],
     6: ['werewolf', 'werewolf', 'villager', 'villager', 'seer', 'hunter'],
     7: ['werewolf', 'werewolf', 'villager', 'villager', 'villager', 'seer', 'hunter'],
     8: ['werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter'],
@@ -31,9 +31,17 @@ let dayVotedArray = [];
 let killedByHunter = '';
 let nightKilled = '';
 let dayKilled = '';
+let killedByWitch = '';
+let witchPotions = {
+    life: false,
+    death: false
+};
+let witchSave = false;
+
 const PHASE_DURATIONS = {
     'night-seer': 20000,        // 30 secondes pour le seer
     'night-werewolf': 30000,    // 30 secondes pour les loups
+    'night-witch': 30000,      // 30 secondes pour la sorcière
     'day-discussion': 10000,   // 2 minutes de discussion
     'day-vote': 30000,          // 30 secondes pour voter
     'hunter-phase-1': 10000,    // 10 secondes pour le hunter
@@ -78,7 +86,7 @@ function broadcastToRole() {
     broadcast({ type: 'playersInGameUpdate', players: playersInGame.map((p) => ({ id: p.id, pseudo: p.pseudo, role: p.role, isAlive: p.isAlive, isMayor: p.isMayor })) });
 }
 
-function executeWerewolfVotes() {
+function getWerewolfToKill(execute = false) {
     var werewolfVotedNumber = {};
     werewolfVotedArray.forEach((vote) => {
         werewolfVotedNumber[vote.votedPseudo] = (werewolfVotedNumber[vote.votedPseudo] || 0) + 1;
@@ -86,14 +94,34 @@ function executeWerewolfVotes() {
     const result = findKeyWithMaxValue(werewolfVotedNumber);
     playersInGame.forEach((player) => {
         if (player.pseudo === result) {
-            player.isAlive = false;
-            nightKilled = player.pseudo;
+            if (execute) {
+                player.isAlive = false;
+            } else {
+                nightKilled = player.pseudo;
+            }
         }
     });
+}
+
+function executeWerewolfVotes() {
+    if (witchSave === false) {
+        getWerewolfToKill(true);
+    } else {
+        witchSave = false;
+    }
+
     broadcast({ type: "playersInGameUpdate", players: playersInGame.map((p) => ({ id: p.id, pseudo: p.pseudo, role: p.role, isAlive: p.isAlive, isMayor: p.isMayor })) });
     werewolfVotedArray = [];
     broadcast({ type: 'werewolfHasVoted', werewolfVotedArray: werewolfVotedArray });
-    sendInfoNight();
+}
+
+function executeWitchKillPlayer() {
+    playersInGame.forEach((player) => {
+        if (player.pseudo === killedByWitch) {
+            player.isAlive = false;
+        }
+    });
+    broadcast({ type: 'playersInGameUpdate', players: playersInGame.map((p) => ({ id: p.id, pseudo: p.pseudo, role: p.role, isAlive: p.isAlive, isMayor: p.isMayor })) });
 }
 
 function executeDayVotes() {
@@ -109,7 +137,7 @@ function executeDayVotes() {
         playerToKill.isAlive = false;
         dayKilled = playerToKill.pseudo;
     }
-    
+
     broadcast({ type: "playersInGameUpdate", players: playersInGame.map((p) => ({ id: p.id, pseudo: p.pseudo, role: p.role, isAlive: p.isAlive, isMayor: p.isMayor })) });
     dayVotedArray = [];
     broadcast({ type: 'dayHasVoted', dayVotedArray: dayVotedArray });
@@ -117,9 +145,15 @@ function executeDayVotes() {
 }
 
 function sendInfoNight() {
-    if (nightKilled !== '') {
-        broadcast({ type: 'infoNight', message: `Cette nuit, ${nightKilled} a été éliminé !` });
+    if (nightKilled !== '' || killedByWitch !== '') {
+        if (killedByWitch !== '') {
+            broadcast({ type: 'infoNight', message: `Cette nuit, ${killedByWitch} a été éliminé !` });
+        }
+        if (nightKilled !== '') {
+            broadcast({ type: 'infoNight', message: `Cette nuit, ${nightKilled} a été éliminé !` });
+        }
         nightKilled = '';
+        killedByWitch = '';
     } else {
         broadcast({ type: 'infoNight', message: `Cette nuit, personne n'a été éliminé !` });
     }
@@ -191,6 +225,12 @@ function stopGame() {
     nightKilled = '';
     dayKilled = '';
     killedByHunter = '';
+    killedByWitch = '';
+    witchPotions = {
+        life: false,
+        death: false
+    };
+    witchSave = false;
     messages = [];
     currentPhase = 'waiting';
     currentPhaseStartTime = null;
@@ -221,8 +261,17 @@ function startNextPhase() {
             currentPhase = 'night-werewolf';
             break;
         case 'night-werewolf':
+            currentPhase = 'night-witch';
+            if (playersInGame.find(player => player.role === 'witch') === undefined || playersInGame.find(player => player.role === 'witch').isAlive === false) {
+                startNextPhase();
+            }
+            getWerewolfToKill();
+            broadcast({ type: 'wolfWillKill', playerToDie: nightKilled });
+            break;
+        case 'night-witch':
             executeWerewolfVotes();
-            checkGameState();
+            executeWitchKillPlayer();
+            sendInfoNight();
             currentPhase = 'hunter-phase-1';
             if (playersInGame.find(player => player.role === 'hunter') === undefined || playersInGame.find(player => player.role === 'hunter').isAlive === false) {
                 startNextPhase();
@@ -230,6 +279,7 @@ function startNextPhase() {
             if (killedByHunter !== '') {
                 startNextPhase();
             }
+            checkGameState();
             break;
         case 'hunter-phase-1':
             currentPhase = 'day-discussion';
@@ -385,6 +435,21 @@ wss.on('connection', (ws) => {
                 startNextPhase();
             }
 
+            if (parsedMessage.type === 'savePlayer') {
+                if (parsedMessage.data.playerPseudo === nightKilled) {
+                    console.log("La sorcière a sauvé un joueur !");
+                    nightKilled = '';
+                    playersInGame.find(player => player.pseudo === parsedMessage.data.playerPseudo).isAlive = true;
+                    witchPotions.life = true;
+                    witchSave = true;
+                }
+            }
+
+            if (parsedMessage.type === 'witchKillPlayer') {
+                playerPseudo = parsedMessage.data.playerPseudo;
+                killedByWitch = playerPseudo;
+            }
+
             if (parsedMessage.type === 'distributeRoles') {
                 broadcastToRole();
             }
@@ -451,9 +516,9 @@ wss.on('connection', (ws) => {
 const PORT = 3000;
 // const HOST = '172.16.10.111';
 // const HOST = '172.20.10.2';
-// const HOST = '192.168.1.189';
+const HOST = '192.168.1.189';
 // const HOST = '192.168.1.31';
-const HOST = '172.16.10.97';
+// const HOST = '172.16.10.97';
 server.listen(PORT, HOST, () => {
     console.log(`Serveur démarré sur http://${HOST}:${PORT}`);
     console.log(`WebSocket en écoute sur ws://${HOST}:${PORT}`);
