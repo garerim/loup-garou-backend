@@ -15,14 +15,15 @@ let roles = [];
 // const roles = ['werewolf', "villager", "seer", "hunter"];
 // const roles = ['werewolf', "werewolf", "werewolf", "villager", "villager", "villager", "villager", "villager", "seer"];
 const roleConfigurations = {
+    3: ['werewolf', 'villager', 'villager'],
     4: ['werewolf', 'witch', 'villager', 'villager'],
-    6: ['werewolf', 'werewolf', 'villager', 'villager', 'seer', 'hunter'],
-    7: ['werewolf', 'werewolf', 'villager', 'villager', 'villager', 'seer', 'hunter'],
-    8: ['werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter'],
-    9: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'seer', 'hunter', 'littleGirl'],
-    10: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter', 'littleGirl'],
-    11: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter', 'littleGirl'],
-    12: ['werewolf', 'werewolf', 'werewolf', 'villager', 'villager', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter', 'littleGirl']
+    6: ['werewolf', 'werewolf', 'witch', 'villager', 'seer', 'hunter'],
+    7: ['werewolf', 'werewolf', 'witch', 'villager', 'villager', 'seer', 'hunter'],
+    8: ['werewolf', 'werewolf', 'witch', 'villager', 'villager', 'villager', 'seer', 'hunter'],
+    9: ['werewolf', 'werewolf', 'werewolf', 'witch', 'villager', 'villager', 'seer', 'hunter', 'littleGirl'],
+    10: ['werewolf', 'werewolf', 'werewolf', 'witch', 'villager', 'villager', 'villager', 'seer', 'hunter', 'littleGirl'],
+    11: ['werewolf', 'werewolf', 'werewolf', 'witch', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter', 'littleGirl'],
+    12: ['werewolf', 'werewolf', 'werewolf', 'witch', 'villager', 'villager', 'villager', 'villager', 'villager', 'seer', 'hunter', 'littleGirl']
 };
 let currentPhase = 'waiting'; // waiting, night-werewolf, day-discussion, day-vote, night-seer, hunter-phase
 let phaseTimeout = null;
@@ -397,7 +398,7 @@ wss.on('connection', (ws) => {
                 if (roleConfigurations[playersInGame.length]) {
                     roles = roleConfigurations[playersInGame.length];
                     gameCanStart = true;
-                    broadcast({ type: 'gameCanStart', message: 'La partie peut commencer !' });
+                    broadcast({ type: 'gameCanStart', message: 'La partie peut commencer !', roles: roles });
                 }
             }
 
@@ -415,6 +416,13 @@ wss.on('connection', (ws) => {
 
                 broadcast({ type: 'playersInGameUpdate', players: playersInGame.map((p) => ({ id: p.id, pseudo: p.pseudo, role: p.role, isAlive: p.isAlive, isMayor: p.isMayor })) });
 
+                if (roleConfigurations[playersInGame.length]) {
+                    roles = roleConfigurations[playersInGame.length];
+                    gameCanStart = true;
+                    broadcast({ type: 'gameCanStart', message: 'La partie peut commencer !', roles: roles });
+                } else {
+                    broadcast({ type: 'gameCantStart', message: 'La partie ne peut commencer car il manque des joueurs.' });
+                }
                 if (!roleConfigurations[playersInGame.length]) {
                     broadcast({ type: 'gameCantStart', message: 'La partie ne peut commencer car il manque des joueurs.' });
                 }
@@ -451,6 +459,10 @@ wss.on('connection', (ws) => {
             }
 
             if (parsedMessage.type === 'distributeRoles') {
+                const newRoles = parsedMessage.data.roles;
+                if (newRoles.length !== 0 && newRoles.length === roles.length) {
+                    roles = newRoles;
+                }
                 broadcastToRole();
             }
 
@@ -516,9 +528,9 @@ wss.on('connection', (ws) => {
 const PORT = 3000;
 // const HOST = '172.16.10.111';
 // const HOST = '172.20.10.2';
-const HOST = '192.168.1.189';
+// const HOST = '192.168.1.189';
 // const HOST = '192.168.1.31';
-// const HOST = '172.16.10.97';
+const HOST = '172.16.10.97';
 server.listen(PORT, HOST, () => {
     console.log(`Serveur démarré sur http://${HOST}:${PORT}`);
     console.log(`WebSocket en écoute sur ws://${HOST}:${PORT}`);
