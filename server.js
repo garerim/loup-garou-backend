@@ -535,8 +535,8 @@ const PORT = 3000;
 // const HOST = '172.20.10.2';
 // const HOST = '192.168.1.189';
 // const HOST = '192.168.1.31';
-const HOST = '172.16.10.97';
-server.listen(PORT, HOST, () => {
-    console.log(`Serveur démarré sur http://${HOST}:${PORT}`);
-    console.log(`WebSocket en écoute sur ws://${HOST}:${PORT}`);
+// const HOST = '172.16.10.97';
+server.listen(PORT, () => {
+    console.log(`Serveur démarré sur http://localhost:${PORT}`);
+    console.log(`WebSocket en écoute sur ws://localhost:${PORT}`);
 });
