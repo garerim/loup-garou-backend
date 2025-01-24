@@ -17,6 +17,7 @@ let roles = [];
 const roleConfigurations = {
     3: ['werewolf', 'villager', 'villager'],
     4: ['werewolf', 'witch', 'villager', 'villager'],
+    5: ['werewolf', 'werewolf', 'witch', 'villager', 'villager'],
     6: ['werewolf', 'werewolf', 'witch', 'villager', 'seer', 'hunter'],
     7: ['werewolf', 'werewolf', 'witch', 'villager', 'villager', 'seer', 'hunter'],
     8: ['werewolf', 'werewolf', 'witch', 'villager', 'villager', 'villager', 'seer', 'hunter'],
@@ -251,6 +252,10 @@ function startNextPhase() {
     clearTimeout(phaseTimeout);
     clearInterval(phaseTimeRemainingInterval);
 
+    if (gameCanStart === false) {
+        return;
+    }
+
     switch (currentPhase) {
         case 'waiting':
             currentPhase = 'night-seer';
@@ -274,7 +279,7 @@ function startNextPhase() {
             executeWitchKillPlayer();
             sendInfoNight();
             currentPhase = 'hunter-phase-1';
-            if (playersInGame.find(player => player.role === 'hunter') === undefined || playersInGame.find(player => player.role === 'hunter').isAlive === false) {
+            if (playersInGame.find(player => player.role === 'hunter') === undefined || playersInGame.find(player => player.role === 'hunter').isAlive === true) {
                 startNextPhase();
             }
             if (killedByHunter !== '') {
@@ -292,8 +297,8 @@ function startNextPhase() {
         case 'day-vote':
             executeDayVotes();
             checkGameState();
-            currentPhase = 'hunter-phase-2';
-            if (playersInGame.find(player => player.role === 'hunter') === undefined || playersInGame.find(player => player.role === 'hunter').isAlive === false) {
+            currentPhase = 'hunter-phase-2';           
+            if (playersInGame.find(player => player.role === 'hunter') === undefined || playersInGame.find(player => player.role === 'hunter').isAlive === true) {
                 startNextPhase();
             }
             if (killedByHunter !== '') {
